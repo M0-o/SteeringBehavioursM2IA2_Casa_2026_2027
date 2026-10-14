@@ -34,9 +34,9 @@ test('population : bornes, conservation des instances et valeurs invalides', () 
   resize(35); assert.equal(vehicles.length, 35); assert.equal(vehicles[0], first);
   resize(8); assert.equal(vehicles.length, 8); assert.equal(first.vel.x, 2);
   resize(8); assert.equal(vehicles[0], first);
-  resize(200); assert.equal(vehicles.length, 200);
+  resize(p.MAX_COUNT); assert.equal(vehicles.length, p.MAX_COUNT);
   resize(1); assert.equal(vehicles.length, 1);
-  for (const n of [0, 201, 1.5, NaN, '20']) assert.throws(() => resize(n), { name: 'RangeError' });
+  for (const n of [0, p.MAX_COUNT + 1, 1.5, NaN, '20']) assert.throws(() => resize(n), { name: 'RangeError' });
 });
 
 test('slider : input met à jour population et compteur sans change', () => {
@@ -45,9 +45,9 @@ test('slider : input met à jour population et compteur sans change', () => {
   const output = {}; const vehicles = [];
   p.bindSlider(slider, output, vehicles, target, () => ({ width: 800, height: 600 }),
     (x, y) => new Vehicle(x, y), rng);
-  for (const count of [1, 57, 200, 8]) {
+  for (const count of [1, 57, p.MAX_COUNT, 8]) {
     slider.value = String(count); events.input();
-    assert.equal(vehicles.length, count); assert.equal(output.value, `${count} / 200`);
+    assert.equal(vehicles.length, count); assert.equal(output.value, `${count} / ${p.MAX_COUNT}`);
   }
   assert.equal(events.change, undefined);
 });
@@ -132,8 +132,8 @@ test('tirage : marges, repli déterministe borné, petite géométrie impossible
   assert.equal(p.respawn(v, smallTarget, 10, 10, rng), false);
   assert.deepEqual([v.pos.x, v.pos.y, v.vel.x, v.vel.y], [5, 5, 1, 2]);
   const vehicles = [];
-  p.resize(vehicles, 200, smallTarget, 10, 10, (x, y) => new Vehicle(x, y), rng);
-  assert.equal(vehicles.length, 200);
+  p.resize(vehicles, 300, smallTarget, 10, 10, (x, y) => new Vehicle(x, y), rng);
+  assert.equal(vehicles.length, 300);
 });
 
 test('population : arrivées simultanées et véhicules supprimés non mis à jour', () => {

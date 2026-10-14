@@ -4,16 +4,71 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Sketch</title>
+    <title>Snake Arrival</title>
 
     <link rel="stylesheet" type="text/css" href="style.css">
 
     <script src="libraries/p5.min.js"></script>
     <script src="libraries/p5.sound.min.js"></script>
     <script src="vehicle.js"></script>
+    <script src="snakeSettings.js"></script>
+    <script src="snakeSegment.js"></script>
+    <script src="snake.js"></script>
+    <script src="food.js"></script>
+    <script src="game.js"></script>
+    <script src="controls.js"></script>
     <script src="sketch.js"></script>
   </head>
   <body>
-    <!-- Pas besoin de déclarer un canvas pour dessiner en P5.js -->
+    <main id="stage"></main>
+
+    <aside id="panel">
+      <section>
+        <h1>Snake Arrival</h1>
+        <div class="scores">
+          <div><span>Score</span><output id="score">0</output></div>
+          <div><span>Best</span><output id="best">0</output></div>
+        </div>
+        <ol id="scoreboard"></ol>
+        <div class="row">
+          <button id="reset">New game</button>
+          <button id="pause">Pause</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Snakes</h2>
+        <div class="row">
+          <select id="snake-select" aria-label="Selected snake"></select>
+          <button id="remove-snake">Remove</button>
+        </div>
+        <div class="row">
+          <button id="spawn-snake" class="primary">Spawn with settings</button>
+          <button id="random-snake">Spawn random</button>
+        </div>
+        <p class="hint">Edits apply live to the selected snake. Click a head on the stage to select it.</p>
+
+        <label class="field">Name <input id="snake-name" type="text" maxlength="16"></label>
+        <label class="field">Behaviour <select id="snake-mode"></select></label>
+        <label class="field">Pattern <select id="snake-pattern"></select></label>
+        <div class="colors">
+          <label>Color <input id="snake-color" type="color"></label>
+          <label>Second color <input id="snake-color2" type="color"></label>
+        </div>
+        <div id="snake-sliders"></div>
+        <p class="hint">Current length: <output id="snake-length">0</output> segments</p>
+      </section>
+
+      <section>
+        <h2>World</h2>
+        <label class="slider">
+          <span>Food on stage</span><output id="food-count-value"></output>
+          <input id="food-count" type="range" min="1" max="100" step="1">
+        </label>
+        <label class="check"><input id="show-magnet" type="checkbox"> Show magnet fields</label>
+        <label class="check"><input id="debug" type="checkbox"> Debug (key d)</label>
+        <p class="hint">Space pauses the game.</p>
+      </section>
+    </aside>
   </body>
 </html>

@@ -6,69 +6,109 @@
     <title>Seek — population de véhicules</title>
     <link rel="stylesheet" href="style.css">
     <script src="libraries/p5.min.js"></script>
-    <script src="libraries/audio.js"></script>
-    <script src="libraries/jsfx.js"></script>
-    <script src="libraries/jsfxlib.js"></script>
-    <script src="libraries/webaudiox.js"></script>
     <script src="vehicle.js"></script>
-    <script src="population.js"></script>
-    <script src="seekVehicle.js"></script>
     <script src="target.js"></script>
-    <script src="targetFutante.js"></script>
-    <script src="scenarios.js"></script>
-    <script src="audio.js"></script>
-    <script src="effectsAudio.js"></script>
+    <script src="population.js"></script>
+    <script src="spatialGrid.js"></script>
+    <script src="vehicleBatch.js"></script>
+    <script src="vehicleGL.js"></script>
+    <script src="hunter.js"></script>
+    <script src="evadingTarget.js"></script>
+    <script src="mitoticTarget.js"></script>
+    <script src="burstParticle.js"></script>
+    <script src="targetBatch.js"></script>
+    <script src="colony.js"></script>
+    <script src="settings.js"></script>
+    <script src="controls.js"></script>
+    <script src="smokeTrails.js"></script>
+    <script src="qualityGovernor.js"></script>
     <script src="sketch.js"></script>
   </head>
   <body>
     <header id="controls">
-      <label for="scenario">Scénario :</label>
-      <select id="scenario">
-        <option value="normal">1 — Suivi de cible et réapparition</option>
-        <option value="flee">2 — La cible fuit les vaisseaux</option>
-      </select>
-      <label><input id="debug" type="checkbox"> Debug (D)</label>
-      <fieldset id="flee-controls" hidden>
-        <legend>Fuite et endurance</legend>
-        <label for="detection-radius">Détection :</label>
-        <input id="detection-radius" type="range" min="50" max="500" step="1" value="200">
-        <output id="detection-radius-value">200 px</output>
-        <label for="exit-distance">Distance de sécurité :</label>
-        <input id="exit-distance" type="range" min="100" max="800" step="1" value="300">
-        <output id="exit-distance-value">300 px</output>
-        <label for="flee-duration">Durée max :</label>
-        <input id="flee-duration" type="range" min="0.5" max="10" step="0.1" value="2.5">
-        <output id="flee-duration-value">2.5 s</output>
-      </fieldset>
       <label for="vehicle-count">Véhicules :</label>
-      <input id="vehicle-count" type="range" min="1" max="200" step="1" value="20">
-      <output id="vehicle-count-value" for="vehicle-count">20 / 200</output>
-      <span class="hint">La cible se déplace seule ; les véhicules la poursuivent.</span>
-      <label for="target-count">Cibles :</label>
-      <input id="target-count" type="range" min="1" max="30" step="1" value="4">
-      <output id="target-count-value" for="target-count">4 / 30</output>
-      <label for="max-speed">Vitesse max :</label>
-      <input id="max-speed" type="range" min="0" max="20" step="0.1" value="4">
-      <output id="max-speed-value" for="max-speed">4</output>
-      <label for="max-force">Force max :</label>
-      <input id="max-force" type="range" min="0" max="10" step="0.01" value="0.1">
-      <output id="max-force-value" for="max-force">0.10</output>
-      <label for="gradient-speed">Vitesse du dégradé :</label>
-      <input id="gradient-speed" type="range" min="0" max="2" step="0.01" value="0.35">
-      <output id="gradient-speed-value" for="gradient-speed">0.35</output>
-      <label for="gradient-depth">Intensité :</label>
-      <input id="gradient-depth" type="range" min="0" max="1" step="0.01" value="0.75">
-      <output id="gradient-depth-value" for="gradient-depth">0.75</output>
-      <button id="audio-toggle" type="button" aria-pressed="false">Activer la musique et les effets</button>
-      <label for="music-volume">Volume musique :</label>
-      <input id="music-volume" type="range" min="0" max="1" step="0.01" value="0.07">
-      <output id="music-volume-value" for="music-volume">0.07</output>
-      <label for="effects-volume">Volume effets :</label>
-      <input id="effects-volume" type="range" min="0" max="1" step="0.01" value="0.35">
-      <output id="effects-volume-value" for="effects-volume">0.35</output>
-      <span class="hint">Alarmes et sweep de fuite : scénario 2 « La cible fuit les vaisseaux ».</span>
-      <span class="hint">Souris : X = filtre et FM, Y = hauteur. Le centre du dégradé suit le pointeur.</span>
+      <input id="vehicle-count" type="range" min="1" max="5000" step="1" value="20">
+      <output id="vehicle-count-value" for="vehicle-count">20 / 5000</output>
+      <span id="target-count">Cibles : 1</span>
+      <span id="burst-count">Éclatées : 0</span>
+      <span id="fps">FPS : –</span>
+      <span id="quality">Qualité : pleine</span>
+      <span class="hint">Les cibles fuient, se divisent, et éclatent quand trop de véhicules les touchent.</span>
     </header>
-    <main id="scene" aria-label="Simulation de véhicules poursuivant une cible"></main>
+
+    <details id="panel" open>
+      <summary>Réglages</summary>
+
+      <fieldset>
+        <legend>Véhicules</legend>
+        <label for="vehicle-behavior">Comportement</label>
+        <select id="vehicle-behavior" data-setting="vehicleBehavior">
+          <option value="seek">Seek (position actuelle)</option>
+          <option value="pursue">Pursue (position anticipée)</option>
+        </select>
+        <label for="vehicle-max-speed">Vitesse max <output for="vehicle-max-speed"></output></label>
+        <input id="vehicle-max-speed" type="range" min="1" max="10" step="0.5" data-setting="vehicleMaxSpeed">
+        <label for="vehicle-max-force">Force de pilotage <output for="vehicle-max-force"></output></label>
+        <input id="vehicle-max-force" type="range" min="0.02" max="0.5" step="0.01" data-setting="vehicleMaxForce">
+        <label for="vehicle-anticipation">Anticipation (pursue) <output for="vehicle-anticipation"></output></label>
+        <input id="vehicle-anticipation" type="range" min="0" max="40" step="1" data-unit=" img" data-setting="vehicleAnticipation">
+      </fieldset>
+
+      <fieldset>
+        <legend>Cibles</legend>
+        <label for="target-threat">Face à un véhicule</label>
+        <select id="target-threat" data-setting="targetThreat">
+          <option value="evade">Evade (fuit la position anticipée)</option>
+          <option value="flee">Flee (fuit la position actuelle)</option>
+          <option value="ignore">Ignorer</option>
+        </select>
+        <label for="target-calm">Au calme</label>
+        <select id="target-calm" data-setting="targetCalm">
+          <option value="mouse">Suivre la souris</option>
+          <option value="wander">Errer (wander)</option>
+        </select>
+        <label for="detection-radius">Rayon de vision <output for="detection-radius"></output></label>
+        <input id="detection-radius" type="range" min="20" max="300" step="5" data-unit=" px" data-setting="detectionRadius">
+        <label for="calm-speed">Vitesse au calme <output for="calm-speed"></output></label>
+        <input id="calm-speed" type="range" min="0.5" max="6" step="0.5" data-setting="calmSpeed">
+        <label for="panic-speed">Vitesse de panique <output for="panic-speed"></output></label>
+        <input id="panic-speed" type="range" min="1" max="12" step="0.5" data-setting="panicSpeed">
+        <label for="target-max-force">Intensité de la fuite <output for="target-max-force"></output></label>
+        <input id="target-max-force" type="range" min="0.05" max="1" step="0.05" data-setting="targetMaxForce">
+        <label for="target-anticipation">Anticipation (evade) <output for="target-anticipation"></output></label>
+        <input id="target-anticipation" type="range" min="0" max="40" step="1" data-unit=" img" data-setting="targetAnticipation">
+        <label for="max-threats">Menaces prises en compte <output for="max-threats"></output></label>
+        <input id="max-threats" type="range" min="1" max="32" step="1" data-setting="maxThreats">
+        <label for="wander-jitter">Variation de l'errance <output for="wander-jitter"></output></label>
+        <input id="wander-jitter" type="range" min="0" max="1" step="0.05" data-setting="wanderJitter">
+      </fieldset>
+
+      <fieldset>
+        <legend>Division</legend>
+        <label for="division-delay">Délai avant division <output for="division-delay"></output></label>
+        <input id="division-delay" type="range" min="1" max="30" step="1" data-unit=" s" data-setting="divisionDelay">
+        <label for="bud-push">Poussée de séparation <output for="bud-push"></output></label>
+        <input id="bud-push" type="range" min="0.1" max="1" step="0.05" data-setting="budPush">
+        <label for="max-targets">Nombre max de cibles <output for="max-targets"></output></label>
+        <input id="max-targets" type="range" min="1" max="500" step="1" data-setting="maxTargets">
+        <button id="reset-targets" type="button">Revenir à une cible</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Santé</legend>
+        <label for="target-health">Coups avant éclatement <output for="target-health"></output></label>
+        <input id="target-health" type="range" min="1" max="20" step="1" data-setting="targetHealth">
+      </fieldset>
+
+      <fieldset>
+        <legend>Affichage</legend>
+        <label class="check"><input id="debug" type="checkbox" data-setting="debug"> Debug : rayon de vision des cibles, flèches de vitesse</label>
+        <label class="check"><input id="smoke" type="checkbox" data-setting="smoke"> Fumée des véhicules</label>
+        <label class="check"><input id="gpu-vehicles" type="checkbox" data-setting="gpuVehicles"> Rendu GPU des véhicules (WebGL2)</label>
+        <label class="check"><input id="auto-quality" type="checkbox" data-setting="autoQuality"> Qualité automatique (vise 60 FPS)</label>
+      </fieldset>
+    </details>
+
+    <main id="scene" aria-label="Simulation de véhicules poursuivant des cibles qui se divisent"></main>
   </body>
 </html>

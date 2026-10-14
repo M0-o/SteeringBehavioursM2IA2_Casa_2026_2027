@@ -2,24 +2,60 @@
 
 Ouvrir `index.html` dans un navigateur (ou servir ce dossier avec un serveur HTTP local).
 
-- 20 véhicules au démarrage, réglables de 1 à 200 avec le slider, pendant le glissement.
-- La cible est une instance autonome de `Target` ; son rayon et sa position varient pendant la simulation.
-- L'arrivée est détectée quand les disques du véhicule et de la cible se touchent (`distance <= vehicle.r + target.r`).
-- Le fond est un dégradé radial arc-en-ciel animé, avec réglages de vitesse et d'intensité.
-- Le bouton « Activer la musique et les effets » démarre la synthèse FM et les effets WebAudioX. « Couper la musique et les effets » met tout le mix à zéro, arrête et déconnecte toutes les sources, puis ferme le contexte audio. Une nouvelle activation crée un nouveau contexte. Aucun son n'est produit avant le premier clic.
-- Déplacer la souris dans le canvas entraîne progressivement le centre du dégradé : X fait varier le cutoff (120–8000 Hz), Y la hauteur (360 Hz en haut, 90 Hz en bas). X pilote aussi la FM lente (1–10 Hz) et sa profondeur. Le centre continue d'osciller autour du pointeur avec la vitesse du dégradé.
-- Les couleurs, la luminosité et le rayon du dégradé suivent le signal du modulateur Web Audio lu par un analyseur. Quand le son est coupé, le dégradé garde son animation autonome sans modulation FM.
-- Les véhicules réapparaissent au bord opposé grâce à `Vehicle.edges()`.
-- Quand les disques du véhicule et de la cible se touchent (`distance <= vehicle.r + target.r`), le véhicule réapparaît ailleurs avec une vitesse et une accélération nulles.
-- Les véhicules conservés lors d'un changement d'effectif gardent leur état.
+- 20 véhicules au démarrage, réglables de 1 à 5000 avec le slider, pendant le glissement (jusqu'à 500 cibles). Le compteur FPS de l'en-tête aide à tester la montée en charge.
+- Les cibles (`MitoticTarget`) fuient automatiquement tout véhicule entré dans leur rayon de vision (100 px par défaut) : `evade` (fuite de la position anticipée), `flee` ou aucune réaction, au choix. Leur allure croît de la vitesse calme à la vitesse de panique quand le véhicule le plus proche approche. Au calme, elles suivent la souris ou errent (`wander`).
+- Après un délai (8 s par défaut), une cible se divise : une fille naît collée à la mère, grossit en s'éloignant sous l'effet d'une poussée de séparation, puis se détache. Le nombre de cibles est plafonné (8 par défaut) ; un bouton revient à une seule cible.
+- Chaque cible a une barre de vie. Un véhicule qui l'atteint (≤ 16 px) lui retire un point de vie, la fait clignoter en blanc et réapparaît ailleurs. Après 5 coups (réglable de 1 à 20), la cible éclate en fragments (`BurstParticle`) qui s'éparpillent puis s'estompent. Une fille naît avec une santé pleine. S'il ne reste plus de cible, une nouvelle apparaît au centre.
+- Les véhicules (`Hunter`) visent la cible la plus proche, en `seek` (bleus) ou en `pursue` (violets).
+- Le panneau « Réglages » permet de changer les comportements (menus déroulants) et leurs paramètres (sliders) pendant l'exécution. Le mode debug affiche le rayon de vision des cibles (orange pendant une fuite).
+- Les véhicules laissent une traînée de fumée colorée calculée sur le GPU (`smokeTrails.js`), désactivable.
 
-Les effets de jeu sont générés par [WebAudioX/jsfx](https://github.com/jeromeetienne/webaudiox) dans `effectsAudio.js`. Le son de fuite boucle indépendamment pour chaque cible et s'arrête avec son état ; un sweep synthétique monte progressivement du grave vers l'aigu selon l'endurance consommée ; l'alarme dure 0,4 s et est limitée à une lecture par cible et par seconde ; les explosions durent 0,7 s. `playDecoyRelease()` est prêt pour le futur événement de largage de leurres, qui n'existe pas encore dans ce projet G1.
+## Organisation
 
-Les curseurs `Volume musique` et `Volume effets` règlent séparément les deux bus audio en temps réel. Le volume par défaut des effets est supérieur à celui de la musique pour garder les alarmes et les sweeps audibles.
+| Fichier | Rôle |
+|---|---|
+| `vehicle.js` | Classe de base : seek, flee, pursue, evade, wander, locomotion, dessin (couleurs en propriétés) |
+| `target.js` | `Target` : mouvement erratique d'origine, compté en images et désactivable (`erratic = false`) |
+| `hunter.js` | `Hunter extends Vehicle` : sélection de la cible la plus proche, seek ou pursue |
+| `evadingTarget.js` | `EvadingTarget extends Target` : perception, fuite pondérée, comportement au calme, santé, debug |
+| `mitoticTarget.js` | `MitoticTarget extends EvadingTarget` : vieillissement, division, bourgeonnement |
+| `burstParticle.js` | `BurstParticle extends Vehicle` : fragment d'éclatement freiné par une force de traînée |
+| `colony.js` | Gestion de scène des cibles : divisions plafonnées, retrait des cibles éclatées, réinitialisation |
+| `population.js` | Gestion de scène des véhicules : slider, apparition, arrivée (signalée par `step`) |
+| `settings.js`, `controls.js` | Réglages par défaut, application aux entités, liaison générique avec les éléments `[data-setting]` |
+| `spatialGrid.js` | Hachage spatial (grille uniforme) : voisins dans un rayon, plus proche voisin exact |
+| `vehicleBatch.js` | Rendu groupé des véhicules : un chemin Canvas par couleur, flèches de vitesse en debug |
+| `vehicleGL.js` | Rendu GPU des véhicules (WebGL2 instancié), activé par défaut ; repli sur `vehicleBatch.js` |
+| `targetBatch.js` | Rendu groupé des cibles (vision, pont de mitose, corps, barres de vie), un chemin par couleur |
+| `smokeTrails.js` | Fumée en WebGL2 direct (pas une entité) : bouffées instanciées, advection en ping-pong, résolution réglable |
+| `qualityGovernor.js` | Qualité automatique : allège fumée puis menaces perçues si une image dépasse le budget de 60 FPS |
+| `sketch.js` | Boucle p5 : réglages → cycle de vie → steering et locomotion → dessin |
 
-Les alarmes et les sweeps sont actifs dans le scénario 2 ; dans le scénario 1, seuls les contacts produisent des explosions. La synchronisation audio crée une source pour chaque cible actuellement en fuite, même si le son est activé en cours de fuite. Elle arrête aussi les sources des cibles supprimées ou devenues inactives. Les tests vérifient ces transitions et le signal des buffers produits par les vrais scripts WebAudioX/jsfx (29 tests au total).
+`mouseTarget.js` n'est plus chargé par la page mais reste testé.
 
-`vehicle.js` reste inchangé. `Target` conserve son animation aléatoire, désormais pilotée par les forces héritées de `seek()` et une horloge locale sans timer permanent. La population est gérée dans `population.js`, la scène et le fond dans `sketch.js`, et la synthèse audio dans `audio.js`.
+## Performances
+
+- Perception limitée par une grille de hachage spatial (taille de case = rayon de vision) : une cible n'examine que les véhicules des cases voisines, un véhicule trouve la cible la plus proche en parcourant des anneaux de cases. Les résultats sont identiques à la recherche exhaustive (vérifié par les tests).
+- Véhicules dessinés sur le GPU (`VehicleGL`) : un triangle envoyé une fois, un tableau de 11 nombres par véhicule (position, orientation, rayon, couleurs) mis à jour à chaque image, un seul appel `drawArraysInstanced`. Le contour est calculé dans le shader. Le rendu se fait dans un canvas hors écran copié dans le canvas p5, ce qui garde l'ordre fumée → véhicules → cibles. La case « Rendu GPU » bascule sur `VehicleBatch` (un chemin Canvas par couleur) pour comparer. `Vehicle.show()` reste disponible pour un véhicule isolé. Les flèches de vitesse ne sont dessinées qu'en mode debug.
+- Fumée en WebGL2 direct, dans un canvas hors écran indépendant de p5 : un triangle par bouffée (arrondi par le shader), toutes en un seul appel instancié, puis advection entre deux textures en ping-pong. À 2000 véhicules : ~8 ms → 1,8 ms.
+- Qualité automatique (case « Qualité automatique », activée par défaut ; niveau affiché dans l'en-tête) : si la durée moyenne des images dépasse 14 ms pendant 20 images, la scène passe au niveau suivant (fumée en demi-résolution, en quart de résolution, sans fumée, puis 3 menaces perçues au plus). Elle remonte d'un niveau après 120 images avec de la marge (moins de 60 % du budget) ; une rechute rapide double ce délai, pour ne pas osciller. Les pics isolés sont ignorés (moyenne lissée). Les réglages de l'utilisateur ne sont pas modifiés.
+- Perception des cibles limitée aux `maxMenaces` véhicules les plus proches (8 par défaut, slider « Menaces prises en compte ») et calculée sans créer de vecteurs. Quand les véhicules s'agglutinent, une cible pouvait voir des centaines de menaces et calculer une force d'évasion pour chacune ; les plus lointaines ne pesaient presque rien dans la moyenne pondérée. L'allure reste fixée par la menace la plus proche.
+- Cibles (`TargetBatch`) et fragments (`BurstParticle.drawAll`, un chemin par couleur et palier d'opacité) dessinés en groupe ; `show()` reste disponible et partage la même géométrie (`healthBar`, `healthColor`, `bodyColor`, `neckQuad`, `appearance`).
+
+Mesuré dans le panneau navigateur intégré (médiane, ms par image ; un navigateur classique est plus rapide) :
+
+| Véhicules / cibles | Avant | Après |
+|---|---|---|
+| 200 / 8 | 17.8 | 7.4 |
+| 1000 / 32 | 62.9 | 20.0 |
+| 3000 / 32 | 197.9 | 82.0 |
+| 3000 / 300 | 499.5 | 147.5 |
+
+Rendu des seuls véhicules, Canvas groupé contre GPU instancié : 7.1 → 1.9 ms (1000), 40.3 → 2.3 ms (3000), 108.6 → 3.5 ms (5000). Image complète à 5000 véhicules : 135 → 43.5 ms ; il reste surtout la fumée (~14 ms) et le steering des véhicules (~11 ms).
+
+Stabilité avec la qualité automatique (images par seconde mesurées, part des images au-delà de 16,7 ms) : 900 véhicules ≈ 59 images/s en qualité pleine (1/296) ; 2000 véhicules ≈ 57 images/s (sans fumée) ; 5000 véhicules ≈ 50 images/s (niveau le plus léger).
+
+400 cibles et 900 véhicules : 161.5 → 17 ms par image (steering des cibles 147 → 7 ms ; dessin des cibles 8.2 → 1.2 ms ; 1000 fragments 8.9 → 2.6 ms). En jeu réel avec 900 véhicules : ~10 ms par image.
 
 ## Tests
 
@@ -29,27 +65,6 @@ Depuis ce dossier, avec Node.js (18 ou plus) :
 node --test tests/*.test.mjs
 ```
 
-Aucune dépendance à installer. Les tests exécutent le vrai `vehicle.js` avec un adaptateur vectoriel minimal et un aléatoire déterministe. La validation du rendu avec p5 et du glissement réel se fait également dans le navigateur.
-
-Les 27 tests Node couvrent aussi les mappings audio, l'arrêt/redémarrage du moteur, la sélection multi-cibles et les durées/cooldowns des effets. Pour mesurer le vrai signal Web Audio, ouvrir `tests/audio-browser.html` et cliquer « Exécuter les tests audio ». Cette page vérifie le signal actif, la fermeture du contexte, le redémarrage, le silence du mix (RMS nul), les variations du filtre/pitch/FM et la lecture du modulateur par les couleurs. Les tests arrêtent leur audio en fin d'exécution.
+Aucune dépendance à installer. Les tests exécutent les vraies classes avec un adaptateur vectoriel minimal (`tests/helpers.mjs`) et un aléatoire déterministe. La validation du rendu avec p5 et du glissement réel se fait également dans le navigateur.
 
 La [spécification](EXO1_SPECIFICATION.md) décrit les règles, le workflow et les cas limites. Elle constitue le document de conception initial ; l'implémentation et les tests sont maintenant présents.
-
-## Deux scénarios
-
-Le menu « Scénario » propose :
-
-1. **Suivi de cible et réapparition** : comportement initial. Les véhicules utilisent `seek()`, rebouclent aux bords et réapparaissent aléatoirement au contact, avec la même instance et les mêmes paramètres. Le test de contact tient compte de la somme des rayons.
-2. **La cible fuit les vaisseaux** : `TargetFutante extends Target`, donc une sous-classe de `Vehicle`, dans `targetFutante.js`. La cible détecte le véhicule le plus proche à 200 px ou moins, double sa vitesse maximale et multiplie sa force maximale par quatre. Elle appelle la méthode héritée `super.flee()` et reprend son comportement normal lorsque tous les prédateurs sont à au moins 300 px, ou après 2,5 secondes de fuite.
-
-Le scénario 2 affiche trois curseurs en temps réel : rayon de détection (50–500 px), distance de sécurité (100–800 px) et durée maximale (0,5–10 s). La distance de sortie reste strictement supérieure au rayon de déclenchement ; l'UI reflète les ajustements nécessaires. Les distances sont mesurées entre centres et ne constituent pas des distances toriques à travers les bords.
-
-Le curseur **Cibles** règle en temps réel le nombre de cibles entre 1 et 30, avec 4 par défaut. Les deux scénarios conservent des collections parallèles de cibles ; chaque véhicule choisit à chaque image la cible dont le centre est le plus proche.
-
-Une barre d'endurance est affichée au-dessus de la cible dans le scénario 2. Elle décroît pendant la fuite et reste vide après épuisement. Une cible épuisée reprend son animation normale ; elle ne peut réarmer sa fuite qu'après retour de tous les prédateurs hors de la distance de sécurité. Cela évite d'enchaîner des épisodes à l'infini sans respecter la durée maximale.
-
-La touche **D** ou la case **Debug** active les vecteurs de vitesse et le cercle de détection. Le cercle est jaune sans prédateur détecté, rouge lorsqu'au moins un est à portée. Il reste caché hors debug. Les paramètres de mouvement, la population, le dégradé et la musique restent disponibles dans les deux scénarios.
-
-Changer de scénario restaure les limites normales, vide la référence de menace et remet l'endurance à 1 ; les véhicules ne sont pas recréés. La génération de véhicules par slider consulte toujours la cible active. `scenarios.js` porte cette sélection, `seekVehicle.js` le rendu debug, et `targetFutante.js` la perception et les états.
-
-Validation : `node --test 1-Seek/tests/*.test.mjs` depuis la racine, **27 tests réussis**. Vérifications Chrome réalisées avec le vrai p5.js : menu, sliders, réapparition, debug, endurance à 50 %, sortie à la distance exacte, épuisement, absence de réarmement immédiat et retour au scénario initial, sans erreur JavaScript.

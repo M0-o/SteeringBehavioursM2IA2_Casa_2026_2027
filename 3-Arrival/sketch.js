@@ -1,6 +1,9 @@
-let target;
-let vehicles = [];
-
+let game;
+let controls;
+let mouseTarget;
+let font;
+// p5 vaut mouseX = mouseY = 0 tant que la souris n'est pas passée sur la scène
+let mouseSeen = false;
 
 // Appelée avant de démarrer l'animation
 function preload() {
@@ -9,57 +12,57 @@ function preload() {
 }
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  const stage = document.getElementById('stage');
+  const canvas = createCanvas(stage.clientWidth, stage.clientHeight);
+  canvas.parent('stage');
+  textFont(font);
 
   // La cible, ce sera la position de la souris
-  target = createVector(random(width), random(height));
+  mouseTarget = createVector(width / 2, height / 2);
 
-  // on cree des vehicules, autant que de points
-  creerVehicules(1);
-}
+  game = new Game({ foodCount: 25 });
+  game.addSnake(defaultSnakeSettings(), width / 2, height / 2);
+  game.refillFood();
 
-function creerVehicules(n) {
-  for (let i = 0; i < n; i++) {
-    let v = new Vehicle(random(width), random(height));
-    vehicles.push(v);
-  }
+  controls = setupControls(game);
 }
 
 // appelée 60 fois par seconde
 function draw() {
-  // couleur pour effacer l'écran
-  background(0);
-  // pour effet psychedelique
-  //background(0, 0, 0, 10);
+  background(12, 14, 20);
 
+  // la cible garde la dernière position de la souris sur la scène
+  if (mouseSeen && mouseInsideCanvas()) mouseTarget.set(mouseX, mouseY);
 
-  target.x = mouseX;
-  target.y = mouseY;
+  if (!controls.state.paused) game.step(mouseTarget);
+  game.show();
+  controls.update();
+}
 
-  // dessin de la cible à la position de la souris
-  push();
-  fill(255, 0, 0);
-  noStroke();
-  ellipse(target.x, target.y, 32);
-  pop();
+function mouseInsideCanvas() {
+  return mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height;
+}
 
-  // si on a affaire au premier véhicule
-  // alors il suit la souris (target)
-  let steeringForce;
-  // le premier véhicule suit la souris avec arrivée
-  vehicles.forEach((vehicle, index) => {
-  
-    // le premier véhicule suit la souris avec arrivée
-    steeringForce = vehicle.arrive(target, 0);
-       vehicle.applyForce(steeringForce);
-       vehicle.update();
-      vehicle.show();
-    })
+function mouseMoved() {
+  if (mouseInsideCanvas()) mouseSeen = true;
+}
 
+function mousePressed() {
+  if (mouseInsideCanvas()) controls.selectAt(mouseX, mouseY);
+}
+
+function windowResized() {
+  const stage = document.getElementById('stage');
+  resizeCanvas(stage.clientWidth, stage.clientHeight);
 }
 
 function keyPressed() {
+  // pas de raccourci pendant la saisie dans le panneau
+  if (document.activeElement && document.activeElement.matches('input, select')) return;
   if (key === 'd') {
     Vehicle.debug = !Vehicle.debug;
-  } 
+  } else if (key === ' ') {
+    controls.togglePause();
+    return false;
+  }
 }

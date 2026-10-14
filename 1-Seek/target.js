@@ -1,38 +1,44 @@
 class Target extends Vehicle {
   constructor(x, y) {
     super(x, y);
-    this.r = 100;
+    this.r = 50; // rayon de la cible
     this.color = 'red';
-    this.vel = p5.Vector.random2D().setMag(random(1, 6));
-    this.normalHeading = this.vel.heading();
-    this.appearanceElapsedMs = 0;
+    this.vel = p5.Vector.random2D(); // vitesse initiale aléatoire
+    // Vitesse max aléatoire enter 1 et 6
+    this.vel.setMag(random(1, 6));
+
+    // Mouvement erratique d'origine (changement brusque toutes les ~60 images
+    // et petite rotation de la vitesse à chaque image). Compté en images plutôt
+    // qu'avec setInterval : pas de timer qui survit à la cible, et une sous-classe
+    // peut le désactiver avec erratic = false.
+    this.erratic = true;
+    this.erraticPeriod = 60;
+    this.erraticFrames = 0;
   }
 
-  advanceAppearance(deltaMilliseconds) {
-    const elapsed = Number(deltaMilliseconds);
-    this.appearanceElapsedMs += Number.isFinite(elapsed) ? Math.max(0, elapsed) : 0;
-    if (this.appearanceElapsedMs >= 1000) {
-      this.appearanceElapsedMs %= 1000;
-      this.normalHeading = random(-Math.PI, Math.PI);
-      this.r = random(20, 50);
-      this.color = color(random(255), random(255), random(255));
+  // Changer la direction de la vitesse aléatoirement
+  randomize() {
+    this.vel = p5.Vector.random2D();
+    this.vel.setMag(random(1, 6));
+    // change le rayon aussi
+    this.r = random(20, 50);
+    // et de couleur
+    this.color = color(random(255), random(255), random(255));
+    // et l'accélération
+    this.acc = p5.Vector.random2D();
+    this.acc.setMag(random(0.1, 0.5));
+  }
+
+  update() {
+    if (this.erratic) {
+      this.erraticFrames++;
+      if (this.erraticFrames >= this.erraticPeriod) {
+        this.erraticFrames = 0;
+        this.randomize();
+      }
+      this.vel.setHeading(this.vel.heading() + random(-0.2, 0.2)); // changement aléatoire de direction
     }
-  }
-
-  applyNormalSteering() {
-    this.normalHeading += random(-0.2, 0.2);
-    const destination = this.pos.copy().add(createVector(
-      Math.cos(this.normalHeading) * 100, Math.sin(this.normalHeading) * 100
-    ));
-    this.applyForce(super.seek(destination));
-  }
-
-  integrate() { super.update(); }
-
-  update(deltaMilliseconds = 1000 / 60) {
-    this.advanceAppearance(deltaMilliseconds);
-    this.applyNormalSteering();
-    this.integrate();
+    super.update();
   }
 
   show() {

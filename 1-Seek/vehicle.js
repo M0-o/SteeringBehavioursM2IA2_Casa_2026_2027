@@ -12,6 +12,15 @@ class Vehicle {
     this.maxForce = 0.1;
     // rayon du véhicule
     this.r = 16;
+    // couleurs de dessin (modifiables par les sous-classes sans réécrire show)
+    this.fillColor = "blue";
+    this.strokeColor = "white";
+    // paramètres de wander : cercle projeté devant le véhicule
+    this.wanderDistance = 60;
+    this.wanderRadius = 25;
+    // variation maximale de l'angle sur le cercle à chaque image (radians)
+    this.wanderJitter = 0.3;
+    this.wanderTheta = 0;
   }
 
   
@@ -50,6 +59,33 @@ class Vehicle {
     return this.seek(target).mult(-1);
   }
 
+  // position future d'un autre véhicule dans "frames" images, à vitesse constante
+  predictPosition(vehicle, frames) {
+    return p5.Vector.add(vehicle.pos, p5.Vector.mult(vehicle.vel, frames));
+  }
+
+  // poursuite : seek de la position future du véhicule
+  pursue(vehicle, frames = 10) {
+    return this.seek(this.predictPosition(vehicle, frames));
+  }
+
+  // évasion : flee de la position future du véhicule
+  evade(vehicle, frames = 10) {
+    return this.flee(this.predictPosition(vehicle, frames));
+  }
+
+  // errance : seek d'un point sur un cercle placé devant le véhicule.
+  // L'angle sur le cercle varie un peu à chaque image (direction continue).
+  wander(rng = Math.random) {
+    this.wanderTheta += (rng() * 2 - 1) * this.wanderJitter;
+    const heading = this.vel.mag() > 0 ? Math.atan2(this.vel.y, this.vel.x) : 0;
+    const angle = heading + this.wanderTheta;
+    const point = createVector(
+      this.pos.x + Math.cos(heading) * this.wanderDistance + Math.cos(angle) * this.wanderRadius,
+      this.pos.y + Math.sin(heading) * this.wanderDistance + Math.sin(angle) * this.wanderRadius);
+    return this.seek(point);
+  }
+
   // --------------------------------------------
   // LES DEUX METHODES SUIVANTES SONT INCHANGEES QUEL QUE SOIT LE COMPORTEMENT
   // --------------------------------------------
@@ -81,13 +117,13 @@ class Vehicle {
     // sauvegarde du contexte graphique (couleur pleine, fil de fer, 
     // épaisseur du trait, position et rotation du repère de référence)
     push();
-    // formes fil de fer en blanc
-    stroke("white");
+    // formes fil de fer (blanc par défaut)
+    stroke(this.strokeColor);
     // épaisseur du trait = 2
     strokeWeight(2);
 
-    // formes pleines en bleu
-    fill("blue");
+    // formes pleines (bleu par défaut)
+    fill(this.fillColor);
 
     // on déplace le repère de référence.
     translate(this.pos.x, this.pos.y);
